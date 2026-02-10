@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 /* Module exports */
 #define CORE_API __attribute__((visibility("default")))
