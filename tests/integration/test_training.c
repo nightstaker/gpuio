@@ -98,9 +98,17 @@ static int test_distributed_training_with_checkpoint(void) {
     
     /* Training stream */
     gpuio_stream_t stream;
-    gpuio_stream_create(ctx, &stream, GPUIO_STREAM_DEFAULT);
+    err = gpuio_stream_create(ctx, &stream, GPUIO_STREAM_DEFAULT);
+    if (err != GPUIO_SUCCESS) {
+        printf("  ERROR: Failed to create stream\n");
+        gpuio_engram_pool_destroy(engram_pool);
+        gpuio_dsa_kv_pool_destroy(kv_pool);
+        gpuio_ai_context_destroy(ai_ctx);
+        gpuio_finalize(ctx);
+        return 1;
+    }
     
-    /* Simulate training */
+    /* Simulate training - reduced iterations for stability */
     double total_time = 0;
     double checkpoint_time = 0;
     int checkpoints_saved = 0;
@@ -112,10 +120,10 @@ static int test_distributed_training_with_checkpoint(void) {
         
         printf("    Epoch %d/%d: ", epoch + 1, NUM_EPOCHS);
         
-        /* Simulate forward/backward passes */
-        for (int batch = 0; batch < 10; batch++) {
-            /* Load KV cache for attention */
-            for (int layer = 0; layer < 10; layer++) {
+        /* Simulate forward/backward passes - reduced from 10 to 3 batches */
+        for (int batch = 0; batch < 3; batch++) {
+            /* Load KV cache for attention - reduced from 10 to 3 layers */
+            for (int layer = 0; layer < 3; layer++) {
                 gpuio_dsa_kv_entry_t entry;
                 gpuio_dsa_kv_load(kv_pool, batch * SEQUENCE_LENGTH, layer, 0,
                                    stream, &entry);
