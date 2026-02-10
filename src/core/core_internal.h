@@ -128,7 +128,7 @@ typedef struct {
     int (*malloc_device)(gpuio_context_t ctx, size_t size, void** ptr);
     int (*malloc_pinned)(gpuio_context_t ctx, size_t size, void** ptr);
     int (*free)(gpuio_context_t ctx, void* ptr);
-    int (*memcpy)(gpuio_context_t ctx, void* dst, const void* src, 
+    int (*memcpy_fn)(gpuio_context_t ctx, void* dst, const void* src,
                   size_t size, gpuio_stream_t stream);
     int (*register_memory)(gpuio_context_t ctx, void* ptr, size_t size,
                            gpuio_mem_access_t access,
