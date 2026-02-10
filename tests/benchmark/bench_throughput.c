@@ -84,8 +84,8 @@ static void bench_memio_memcpy(void) {
     gpuio_context_t ctx;
     gpuio_init(&ctx, NULL);
     
-    /* Test different sizes */
-    size_t sizes[] = {4 KB, 64 KB, 1 MB, 16 MB, 256 MB};
+    /* Test different sizes (in bytes) */
+    size_t sizes[] = {4096, 65536, 1048576, 16777216, 268435456};
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
     
     for (int s = 0; s < num_sizes; s++) {

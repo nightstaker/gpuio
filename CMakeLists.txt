@@ -45,7 +45,6 @@ include_directories(
 # Core library
 # ============================================================================
 set(CORE_SOURCES
-    src/gpuio.c
     src/core/context.c
     src/core/memory.c
     src/core/stream.c
