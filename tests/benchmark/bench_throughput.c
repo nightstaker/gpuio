@@ -348,6 +348,8 @@ static void bench_engram_query(void) {
  * ============================================================================ */
 
 int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
     printf("============================================================\n");
     printf("gpuio Performance Benchmarks\n");
     printf("Version: %s\n", gpuio_get_version_string());

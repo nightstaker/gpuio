@@ -419,6 +419,8 @@ static int test_batched_inference_throughput(void) {
 
 /* Main test runner */
 int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
     printf("============================================================\n");
     printf("gpuio Inference Workload Integration Tests\n");
     printf("============================================================\n");

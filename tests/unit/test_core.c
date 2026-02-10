@@ -417,6 +417,7 @@ static void print_header(const char* title) {
 }
 
 int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;
     printf("gpuio Core API Unit Tests\n");
     printf("Version: %s\n", gpuio_get_version_string());
     printf("Run at: %s\n", __TIME__);

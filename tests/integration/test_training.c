@@ -368,6 +368,8 @@ static int test_fault_tolerance_recovery(void) {
 
 /* Main test runner */
 int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
     printf("============================================================\n");
     printf("gpuio Training Workload Integration Tests\n");
     printf("============================================================\n");
