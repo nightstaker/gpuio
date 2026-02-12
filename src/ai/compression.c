@@ -22,7 +22,7 @@
 /**
  * @brief Convert single float to IEEE 754 half-precision float.
  */
-static uint16_t float_to_half(float f) {
+uint16_t gpuio_float_to_half(float f) {
     union { float f; uint32_t i; } conv = { .f = f };
     uint32_t sign = (conv.i >> 31) & 0x1;
     uint32_t exp = (conv.i >> 23) & 0xFF;
@@ -66,7 +66,7 @@ static uint16_t float_to_half(float f) {
 /**
  * @brief Convert IEEE 754 half-precision float to single float.
  */
-static float half_to_float(uint16_t h) {
+float gpuio_half_to_float(uint16_t h) {
     uint32_t sign = (h >> 15) & 0x1;
     uint32_t exp = (h >> 10) & 0x1F;
     uint32_t mant = h & 0x3FF;
@@ -128,7 +128,7 @@ gpuio_error_t ai_codec_compress_fp16(struct gpuio_codec* codec,
     uint16_t* output_h = (uint16_t*)output;
     
     for (size_t i = 0; i < num_elements; i++) {
-        output_h[i] = float_to_half(input_f[i]);
+        output_h[i] = gpuio_float_to_half(input_f[i]);
     }
     
     *output_size = required_size;
@@ -159,7 +159,7 @@ gpuio_error_t ai_codec_decompress_fp16(struct gpuio_codec* codec,
     float* output_f = (float*)output;
     
     for (size_t i = 0; i < num_elements; i++) {
-        output_f[i] = half_to_float(input_h[i]);
+        output_f[i] = gpuio_half_to_float(input_h[i]);
     }
     
     *output_size = required_size;

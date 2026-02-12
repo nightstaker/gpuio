@@ -7,6 +7,7 @@
 #include "lru_cache.h"
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* ============================================================================
  * LRU Entry Structure

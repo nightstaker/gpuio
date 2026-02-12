@@ -14,6 +14,9 @@ option(BUILD_AI_MODULE "Build AI Extensions module" ON)
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
+# Feature test macros for POSIX and GNU functions
+add_compile_definitions(_GNU_SOURCE _POSIX_C_SOURCE=200809L)
+
 # Compiler flags
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
