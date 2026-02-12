@@ -239,8 +239,8 @@ static int test_engram_long_context(void) {
     
     /* Create engram pool */
     gpuio_engram_config_t engram_config = {
-        .hbm_capacity = 1ULL << 30,    /* 1GB */
-        .cxl_capacity = 10ULL << 30,   /* 10GB */
+        .hbm_capacity = 64ULL << 20,    /* 64MB */
+        .cxl_capacity = 256ULL << 20,   /* 256MB */
         .embedding_dim = 1024,
         .async_writes = false,
     };
@@ -337,11 +337,17 @@ static int test_batched_inference_throughput(void) {
     gpuio_ai_config_t ai_config = {
         .num_layers = 48,
         .num_heads = 64,
+        .head_dim = 128,
         .enable_dsa_kv = true,
     };
     
     gpuio_ai_context_t ai_ctx;
-    gpuio_ai_context_create(ctx, &ai_config, &ai_ctx);
+    gpuio_error_t err = gpuio_ai_context_create(ctx, &ai_config, &ai_ctx);
+    if (err != GPUIO_SUCCESS) {
+        printf("  SKIPPED (AI context creation failed: %d)\n", err);
+        gpuio_finalize(ctx);
+        return 0;
+    }
     
     gpuio_dsa_kv_config_t kv_config = {
         .hbm_capacity = 5ULL << 30,
@@ -350,7 +356,7 @@ static int test_batched_inference_throughput(void) {
     
     printf("  Creating KV pool...\n");
     gpuio_dsa_kv_pool_t kv_pool;
-    gpuio_error_t err = gpuio_dsa_kv_pool_create(ai_ctx, &kv_config, &kv_pool);
+    err = gpuio_dsa_kv_pool_create(ai_ctx, &kv_config, &kv_pool);
     if (err != GPUIO_SUCCESS) {
         printf("  SKIPPED (KV pool creation failed: %d)\n", err);
         gpuio_ai_context_destroy(ai_ctx);

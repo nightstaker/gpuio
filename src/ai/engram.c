@@ -49,55 +49,64 @@ int ai_engram_init(struct ai_engram* engram, gpuio_ai_context_t ai_ctx,
     engram->ai_ctx = ai_ctx;
     memcpy(&engram->config, config, sizeof(gpuio_engram_config_t));
     
+    /* Initialize all pointers to NULL for safe cleanup */
+    engram->hbm_tier.storage = NULL;
+    engram->cxl_tier.storage = NULL;
+    engram->remote_tier.storage = NULL;
+    engram->hash_table = NULL;
+    engram->vector_index = NULL;
+    engram->write_buffer = NULL;
+    engram->lru_cache = NULL;
+    engram->write_thread_running = false;
+    
     /* Initialize tiers */
     engram->hbm_tier.capacity = config->hbm_capacity;
     engram->hbm_tier.used = 0;
-    engram->hbm_tier.storage = malloc(config->hbm_capacity);
-    if (!engram->hbm_tier.storage && config->hbm_capacity > 0) return -1;
+    if (config->hbm_capacity > 0) {
+        engram->hbm_tier.storage = malloc(config->hbm_capacity);
+        if (!engram->hbm_tier.storage) goto init_failed;
+    }
     pthread_mutex_init(&engram->hbm_tier.lock, NULL);
     
     engram->cxl_tier.capacity = config->cxl_capacity;
     engram->cxl_tier.used = 0;
-    engram->cxl_tier.storage = malloc(config->cxl_capacity);
-    if (!engram->cxl_tier.storage && config->cxl_capacity > 0) {
-        free(engram->hbm_tier.storage);
-        return -1;
+    if (config->cxl_capacity > 0) {
+        engram->cxl_tier.storage = malloc(config->cxl_capacity);
+        if (!engram->cxl_tier.storage) {
+            pthread_mutex_destroy(&engram->hbm_tier.lock);
+            free(engram->hbm_tier.storage);
+            goto init_failed;
+        }
     }
     pthread_mutex_init(&engram->cxl_tier.lock, NULL);
     
     engram->remote_tier.capacity = config->remote_archive_uri ? 
                                    (100ULL << 30) : 0; /* 100GB default */
     engram->remote_tier.used = 0;
-    engram->remote_tier.storage = NULL;
     pthread_mutex_init(&engram->remote_tier.lock, NULL);
     
     /* Allocate hash table */
     engram->hash_table = calloc(AI_ENGRAM_HASH_BUCKETS, sizeof(ai_engram_entry_t*));
     if (!engram->hash_table) {
-        free(engram->hbm_tier.storage);
+        pthread_mutex_destroy(&engram->cxl_tier.lock);
+        pthread_mutex_destroy(&engram->hbm_tier.lock);
         free(engram->cxl_tier.storage);
-        return -1;
+        free(engram->hbm_tier.storage);
+        goto init_failed;
     }
     
     /* Allocate vector index */
     engram->vector_index_size = 1024;
     engram->vector_index = calloc(engram->vector_index_size, sizeof(ai_engram_entry_t*));
     if (!engram->vector_index) {
-        free(engram->hash_table);
-        free(engram->hbm_tier.storage);
-        free(engram->cxl_tier.storage);
-        return -1;
+        goto init_failed;
     }
     
     /* Initialize write buffer */
     if (config->async_writes && config->write_buffer_size > 0) {
         engram->write_buffer = malloc(config->write_buffer_size);
         if (!engram->write_buffer) {
-            free(engram->vector_index);
-            free(engram->hash_table);
-            free(engram->hbm_tier.storage);
-            free(engram->cxl_tier.storage);
-            return -1;
+            goto init_failed;
         }
         engram->write_buffer_used = 0;
     }
@@ -112,12 +121,12 @@ int ai_engram_init(struct ai_engram* engram, gpuio_ai_context_t ai_ctx,
     /* Initialize LRU cache (using common utilities) */
     engram->lru_cache = lru_cache_create();
     if (!engram->lru_cache) {
-        free(engram->write_buffer);
-        free(engram->vector_index);
-        free(engram->hash_table);
-        free(engram->hbm_tier.storage);
-        free(engram->cxl_tier.storage);
-        return -1;
+        pthread_mutex_destroy(&engram->lock);
+        pthread_mutex_destroy(&engram->write_buffer_lock);
+        pthread_mutex_destroy(&engram->stats_lock);
+        pthread_mutex_destroy(&engram->index_lock);
+        pthread_mutex_destroy(&engram->hash_lock);
+        goto init_failed;
     }
     
     /* Initialize statistics */
@@ -139,6 +148,23 @@ int ai_engram_init(struct ai_engram* engram, gpuio_ai_context_t ai_ctx,
                 config->async_writes);
     
     return 0;
+
+init_failed:
+    /* Cleanup allocated resources on failure */
+    free(engram->write_buffer);
+    engram->write_buffer = NULL;
+    free(engram->vector_index);
+    engram->vector_index = NULL;
+    free(engram->hash_table);
+    engram->hash_table = NULL;
+    pthread_mutex_destroy(&engram->remote_tier.lock);
+    pthread_mutex_destroy(&engram->cxl_tier.lock);
+    pthread_mutex_destroy(&engram->hbm_tier.lock);
+    free(engram->cxl_tier.storage);
+    engram->cxl_tier.storage = NULL;
+    free(engram->hbm_tier.storage);
+    engram->hbm_tier.storage = NULL;
+    return -1;
 }
 
 /**
@@ -146,6 +172,11 @@ int ai_engram_init(struct ai_engram* engram, gpuio_ai_context_t ai_ctx,
  */
 void ai_engram_cleanup(struct ai_engram* engram) {
     if (!engram) return;
+    
+    /* Check if already cleaned up (hash_table would be NULL after cleanup) */
+    if (!engram->hash_table && !engram->lru_cache) {
+        return;  /* Already cleaned up */
+    }
     
     /* Stop background thread */
     if (engram->write_thread_running) {
@@ -156,17 +187,23 @@ void ai_engram_cleanup(struct ai_engram* engram) {
     pthread_mutex_lock(&engram->lock);
     
     /* Free all entries via LRU cache destroy */
-    lru_cache_destroy(engram->lru_cache, NULL, NULL);
-    engram->lru_cache = NULL;
+    if (engram->lru_cache) {
+        lru_cache_destroy(engram->lru_cache, NULL, NULL);
+        engram->lru_cache = NULL;
+    }
     
     /* Free hash table (entries already freed) */
     free(engram->hash_table);
     engram->hash_table = NULL;
     
     free(engram->vector_index);
+    engram->vector_index = NULL;
     free(engram->hbm_tier.storage);
+    engram->hbm_tier.storage = NULL;
     free(engram->cxl_tier.storage);
+    engram->cxl_tier.storage = NULL;
     free(engram->write_buffer);
+    engram->write_buffer = NULL;
     
     pthread_mutex_unlock(&engram->lock);
     

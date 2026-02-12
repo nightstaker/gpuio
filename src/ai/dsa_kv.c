@@ -84,11 +84,18 @@ int ai_dsa_kv_init(struct ai_dsa_kv* kv, gpuio_ai_context_t ai_ctx,
 void ai_dsa_kv_cleanup(struct ai_dsa_kv* kv) {
     if (!kv) return;
     
+    /* Check if already cleaned up (hash_table would be NULL after cleanup) */
+    if (!kv->hash_table && !kv->lru_cache) {
+        return;  /* Already cleaned up */
+    }
+    
     pthread_mutex_lock(&kv->lock);
     
     /* Free all entries via LRU cache destroy */
-    lru_cache_destroy(kv->lru_cache, NULL, NULL);
-    kv->lru_cache = NULL;
+    if (kv->lru_cache) {
+        lru_cache_destroy(kv->lru_cache, NULL, NULL);
+        kv->lru_cache = NULL;
+    }
     
     /* Free hash table (entries already freed by LRU destroy) */
     free(kv->hash_table);
@@ -96,9 +103,11 @@ void ai_dsa_kv_cleanup(struct ai_dsa_kv* kv) {
     
     if (kv->cxl_tier.cxl_device_path) {
         free(kv->cxl_tier.cxl_device_path);
+        kv->cxl_tier.cxl_device_path = NULL;
     }
     if (kv->remote_tier.remote_uri) {
         free(kv->remote_tier.remote_uri);
+        kv->remote_tier.remote_uri = NULL;
     }
     
     pthread_mutex_unlock(&kv->lock);
@@ -337,6 +346,9 @@ gpuio_error_t gpuio_dsa_kv_load(gpuio_dsa_kv_pool_t pool,
     (void)stream;
     
     if (!pool || !entry) return GPUIO_ERROR_INVALID_ARG;
+    
+    /* Initialize entry to NULL in case of miss */
+    *entry = NULL;
     
     struct ai_dsa_kv* kv = (struct ai_dsa_kv*)pool;
     

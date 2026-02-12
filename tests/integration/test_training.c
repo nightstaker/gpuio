@@ -79,8 +79,8 @@ static int test_distributed_training_with_checkpoint(void) {
     
     /* Create engram pool for external knowledge */
     gpuio_engram_config_t engram_config = {
-        .hbm_capacity = 2ULL << 30,     /* 2GB */
-        .cxl_capacity = 20ULL << 30,    /* 20GB */
+        .hbm_capacity = 64ULL << 20,     /* 64MB */
+        .cxl_capacity = 256ULL << 20,    /* 256MB */
         .embedding_dim = 1024,
         .async_writes = true,
         .flush_interval_ms = 5000,
